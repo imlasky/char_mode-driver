@@ -14,6 +14,7 @@ A simple kernel module: a charater-mode device driver
 #include <linux/uaccess.h>	//needed for copy_to_user
 
 #define DEVICE_NAME "testdev"
+#define CLASS_NAME "chardev"
 #define BUFF_SIZE 1024
 
 //License and author info
@@ -24,6 +25,8 @@ MODULE_DESCRIPTION("A simple character-mode Driver.");
 static int majorNumber;
 static char message[BUFF_SIZE] = {0};
 static int messageSize;
+static struct class * testdevClass = NULL;
+static struct device* testdevDevice = NULL;
 
 //prototypes for file ops
 static int dev_open(struct inode *inodep, struct file *filep);
@@ -36,7 +39,7 @@ static struct file_operations fops =
 	.open = dev_open,
 	.read = dev_read,
 	.write = dev_write,
-	.release = dev_release
+	.release = dev_release,
 };
 
 
@@ -50,18 +53,39 @@ static int __init testdev_init(void) {
 		return majorNumber;
 	}
 	printk(KERN_INFO "testdev: Registered major version number %d.\n", majorNumber);
+
+	testdevClass = class_create(THIS_MODULE, CLASS_NAME);
+	if (IS_ERR(testdevClass)){
+		unregister_chrdev(majorNumber,DEVICE_NAME);
+		printk(KERN_ALERT "Failed to register device class\n");
+		return PTR_ERR(testdevClass);
+	}
+	printk(KERN_INFO "testdev: Device class registered correctly\n");
+
+	testdevDevice = device_create(testdevClass, NULL, MKDEV(majorNumber,0), NULL, DEVICE_NAME);
+	if (IS_ERR(testdevDevice)){
+		class_destroy(testdevClass);
+		unregister_chrdev(majorNumber, DEVICE_NAME);
+		printk(KERN_ALERT "testdev: Failed to create the device\n");
+		return PTR_ERR(testdevDevice);
+	}
+	printk(KERN_INFO "testdev: Device class created correctly\n");
 	strcpy(message, "");
 	return 0;
 }
-module_init(testdev_init);
 
 
 //Exit: unregister the Major number
 static void __exit testdev_exit(void) {
+	device_destroy(testdevClass, MKDEV(majorNumber, 0));
+	printk(KERN_INFO "testdev: Destroyed device\n");
+	class_unregister(testdevClass);
+	printk(KERN_INFO "testdev: Unregistered class\n");
+	class_destroy(testdevClass);
+	printk(KERN_INFO "testdev: Destroyed class\n");
 	unregister_chrdev(majorNumber, DEVICE_NAME);
 	printk(KERN_INFO "testdev: Unregistered major version number %d.\n", majorNumber);
 }
-module_exit(testdev_exit);
 
 
 //Open: open the device
@@ -102,9 +126,8 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 	if(len > strlen(message)) {
 		err = copy_to_user(buffer, message, strlen(message));
 		if(err == 0) {
-			printk(KERN_INFO "testdev: Insufficient characters. Sent %d characters to user.\n", strlen(message));
-			strcpy(message, "");
-			return 0;
+			printk(KERN_INFO "testdev: Sent %d characters to user.\n", strlen(message));
+			return (messageSize = 0);
 		} else {
 			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
 			return err;
@@ -112,7 +135,7 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 	} else {
 		err = copy_to_user(buffer, message, len);
 		if(err == 0) {
-			printk(KERN_INFO "testdev: Sent %d characters to user.\n", len);
+			printk(KERN_INFO "testdev: Insufficient buffer. Sent %d characters to user.\n", len);
 			//I dislike messing with strings as char arrays directly, but it seems that's the only choice for substrings in c.
 			//TODO: Edge cases need to be tested thoroughly, this is very prone to off-by-one errors or accesses beyond the terminating null.
 			memcpy(message, &message[len], strlen(message) - len);
@@ -123,3 +146,6 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 		}
 	}
 }
+
+module_init(testdev_init);
+module_exit(testdev_exit);
