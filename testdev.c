@@ -102,12 +102,18 @@ static int dev_release(struct inode* inodep, struct file* filep) {
 
 //Write: write information to the device
 static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, loff_t* offset) {
-	int space = BUFF_SIZE - strlen(message);
+	int space = BUFF_SIZE; 
 	if(space > 0) {
+		//sprintf(message,"%s",buffer);
 		strncpy(message, buffer, space);   // appending received string
 		messageSize = strlen(message);    // store the length of the stored message
+		if(message[0] == '\n' && messageSize == 1){
+			strcpy(message,"");
+			messageSize = 0;
+		}
+		space -= messageSize;
 		if(space >= len) {
-			printk(KERN_INFO "testdev: Received %zu characters from the user\n", len);
+			printk(KERN_INFO "testdev: Received %zu characters from the user\n", messageSize);
 			return len;
 		} else {
 			printk(KERN_INFO "testdev: Received %zu characters from the user. Buffer full\n", space);
@@ -139,7 +145,7 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 			//I dislike messing with strings as char arrays directly, but it seems that's the only choice for substrings in c.
 			//TODO: Edge cases need to be tested thoroughly, this is very prone to off-by-one errors or accesses beyond the terminating null.
 			memcpy(message, &message[len], strlen(message) - len);
-			return 0;
+			return (messageSize = 0);
 		} else {
 			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
 			return err;

@@ -5,7 +5,7 @@
 #include<string.h>
 #include<unistd.h>
  
-#define BUFFER_LENGTH 1024               ///< The buffer length (crude but fine)
+#define BUFFER_LENGTH 1050               ///< The buffer length (crude but fine)
 static char receive[BUFFER_LENGTH];     ///< The receive buffer from the LKM
  
 int main(){
@@ -18,14 +18,15 @@ int main(){
 		return errno;
 	}
 	printf("Type in a short string to send to the kernel module:\n");
-	scanf("%[^\n]%*c", stringToSend);                // Read in a string (with spaces)
+	//scanf("%[^\n]*c", stringToSend);                // Read in a string (with spaces)
+	fgets(stringToSend ,sizeof stringToSend, stdin);
 	printf("Writing message to the device [%s].\n", stringToSend);
 	ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
 	if (ret < 0){
 		perror("Failed to write the message to the device.");
 		return errno;
 	}
-						   
+	  				   
 	printf("Press ENTER to read back from the device...\n");
 	getchar();
 		 
