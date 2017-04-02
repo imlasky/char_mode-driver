@@ -131,19 +131,16 @@ static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, lof
 //	}
 	int space = BUFF_SIZE - messageSize;
 	if (space > 0) {
-		if (buffer[0] == '\n' && len == 1){return -1;}
-		else {
-			if (space > len) {
-				strcat(message,buffer);
-				messageSize = strlen(message);
-				printk(KERN_INFO "testdev: Received %zu characters from the user\n", len);
-				return len;
-			} else {
-				strncat(message,buffer,len-space);
-				messageSize = strlen(message);
-				printk(KERN_INFO "testdev: Buffer full. Only wrote %zu characters from the user.\n", len-space);
-				return len-space;
-			}
+		if (space > len) {
+			strcat(message,buffer);
+			messageSize = strlen(message);
+			printk(KERN_INFO "testdev: Received %zu characters from the user\n", len);
+			return len;
+		} else {
+			strncat(message,buffer,len-space);
+			messageSize = strlen(message);
+			printk(KERN_INFO "testdev: Buffer full. Only wrote %zu characters from the user.\n", len-space);
+			return len-space;
 		}
 	} else {
 		printk(KERN_INFO "testdev: Cannot receive characters from the user. Buffer full.\n");
@@ -159,11 +156,19 @@ static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, lof
 static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* offset) {
 	//TODO: Stub
 	int err =0;
-	if(len > strlen(message)) {
-		err = copy_to_user(buffer, message, strlen(message));
+	size_t i;
+	if(len > messageSize) {
+		if (messageSize > 0) {
+			err = copy_to_user(buffer, message, messageSize);
+		} else {
+			err = copy_to_user(buffer, "", len);
+		}
 		if(err == 0) {
-			printk(KERN_INFO "testdev: Sent %d characters to user.\n", strlen(message));
-			return 0;
+			printk(KERN_INFO "testdev: Sent %d characters to user.\n", messageSize);
+			for (i = 0; i < BUFF_SIZE; i++) {
+				message[i] = 0;
+			}
+			return (messageSize = 0);
 		} else {
 			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
 			return err;
@@ -174,7 +179,7 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 			printk(KERN_INFO "testdev: Insufficient buffer. Sent %d characters to user.\n", len);
 			//I dislike messing with strings as char arrays directly, but it seems that's the only choice for substrings in c.
 			//TODO: Edge cases need to be tested thoroughly, this is very prone to off-by-one errors or accesses beyond the terminating null.
-			memcpy(message, &message[len], strlen(message) - len);
+			memcpy(message,&message[len],BUFF_SIZE - len);
 			return 0;
 		} else {
 			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
