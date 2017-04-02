@@ -25,7 +25,7 @@ int main(){
 	    printf("Enter a number to make a selection\n");  
 	    printf("1- Send/write string to kernel module\n");
 	    printf("2- Read string from kernel module\n"); 
-	    printf("0- Exit program\n"); 
+	    printf("0- Exit program\n\n\n"); 
 	    scanf("%d%*c", &selection); 
 	    if (selection == 1)
 	    {

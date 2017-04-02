@@ -15,7 +15,7 @@ A simple kernel module: a charater-mode device driver
 
 #define DEVICE_NAME "testdev"
 #define CLASS_NAME "chardev"
-#define BUFF_SIZE 1024
+#define BUFF_SIZE 100 
 
 //License and author info
 MODULE_LICENSE("GPL");
@@ -129,7 +129,9 @@ static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, lof
 //		printk(KERN_INFO "testdev: Cannot receive characters from the user. Buffer full.\n");
 //		return -1;
 //	}
-	int space = BUFF_SIZE - messageSize;
+	size_t space = BUFF_SIZE - messageSize;
+	if (len > BUFF_SIZE)
+		len = BUFF_SIZE;
 	if (space > 0) {
 		if (space > len) {
 			strcat(message,buffer);
@@ -137,6 +139,12 @@ static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, lof
 			printk(KERN_INFO "testdev: Received %zu characters from the user\n", len);
 			return len;
 		} else {
+			if (space == len) {
+				strcpy(message,buffer);
+				messageSize = BUFF_SIZE;
+				printk(KERN_INFO "testdev: Buffer full. Only wrote %zu characters from the user.\n",len);
+				return len;
+			}
 			strncat(message,buffer,len-space);
 			messageSize = strlen(message);
 			printk(KERN_INFO "testdev: Buffer full. Only wrote %zu characters from the user.\n", len-space);
@@ -154,36 +162,105 @@ static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, lof
 
 //Read: read information from the device
 static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* offset) {
-	//TODO: Stub
-	int err =0;
-	//size_t i;
-	if(len > messageSize) {
-		if (messageSize > 0) {
-			err = copy_to_user(buffer, message, messageSize);
+	int err = 0;
+	static char messageTemp [BUFF_SIZE] = {0};
+	size_t i;
+
+	if (len >= messageSize) {
+		if (messageSize == 0 ) {
+			err = copy_to_user(buffer,"",1);
 		} else {
-			err = copy_to_user(buffer, "", len);
+			err = copy_to_user(buffer,message,messageSize);
 		}
-		if(err == 0) {
-			printk(KERN_INFO "testdev: Sent %d characters to user.\n", messageSize);
+		if (err == 0) {
+			printk(KERN_INFO "testdev: Sent %d characters to the user\n",messageSize);
 			strcpy(message,"");
-			return (messageSize = 0);
-		} else {
-			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
-			return err;
-		}
-	} else {
-		err = copy_to_user(buffer, message, len);
-		if(err == 0) {
-			printk(KERN_INFO "testdev: Insufficient buffer. Sent %d characters to user.\n", len);
-			//I dislike messing with strings as char arrays directly, but it seems that's the only choice for substrings in c.
-			//TODO: Edge cases need to be tested thoroughly, this is very prone to off-by-one errors or accesses beyond the terminating null.
-			memcpy(message,&message[len],BUFF_SIZE - len);
+			messageSize = 0;
 			return 0;
 		} else {
-			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
-			return err;
+			printk(KERN_INFO "testdev: Failed to send %d characters to the user.\n",messageSize);
+			return -EFAULT;
 		}
+	} else {
+		err = copy_to_user(buffer,message,len);
+		if(err == 0) {
+			printk(KERN_INFO "testdev: Sent %d characters to the user\n",len);
+			messageSize -= len;
+			for (i = len; i < BUFF_SIZE; i++) {
+				messageTemp[i-len] = message[i];
+			}
+			strcpy(message,messageTemp);
+			strcpy(messageTemp,"");
+			return 0;
+		} else {
+			printk(KERN_INFO "testdev: Failed to send %d characters to the user.\n", len);
+			return -EFAULT;
+		}
+
 	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	//TODO: Stub
+	//int err =0;
+	//size_t i;
+	//static char messageTemp [BUFF_SIZE] = {0};
+	//if (len > BUFF_SIZE)
+	//	len = BUFF_SIZE;
+	//if(len > messageSize) {
+	//	if (messageSize > 0) {
+	//		err = copy_to_user(buffer, message, messageSize);
+	//	} else {
+	//		err = copy_to_user(buffer, "", len);
+	//	}
+	//	if(err == 0) {
+	//		printk(KERN_INFO "testdev: Sent %d characters to user.\n", messageSize);
+	//		strcpy(message,"");
+	//		return (messageSize = 0);
+	//	} else {
+	//		printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
+	//		return err;
+	//	}
+	//} else {
+	//	err = copy_to_user(buffer, message, len);
+	//	if(err == 0) {
+	//		printk(KERN_INFO "testdev: Insufficient buffer. Sent %d characters to user.\n", len);
+	//		//I dislike messing with strings as char arrays directly, but it seems that's the only choice for substrings in c.
+	//		//TODO: Edge cases need to be tested thoroughly, this is very prone to off-by-one errors or accesses beyond the terminating null.
+	//		//memcpy(message,&message[len],BUFF_SIZE - len);
+	//		for (i = len; i < BUFF_SIZE; i++){
+	//			messageTemp[len - i] = message[i];
+	//		}
+	//		strcpy(message,messageTemp);
+	//		strcpy(messageTemp,"");
+	//		return 0;
+	//	} else {
+	//		printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
+	//		return err;
+	//	}
+	//}
 }
 
 module_init(testdev_init);
