@@ -9,7 +9,7 @@
 static char receive[BUFFER_LENGTH];     ///< The receive buffer from the LKM
  
 int main(){
-	int ret, fd;
+	int ret, fd, readLength;
 	char stringToSend[BUFFER_LENGTH];
 	printf("Starting device test code example...\n");
 	fd = open("/dev/testdev", O_RDWR);             // Open the device with read/write access
@@ -44,10 +44,14 @@ int main(){
 	    }
 	    else if(selection == 2)
 	    {
-		printf("Press ENTER to read back from the device...\n");
-		getchar();
+		printf("How many bytes would you like to read back?\n");
+		scanf("%d%*c",&readLength);
+		if(readLength > BUFFER_LENGTH)
+		{
+			readLength = BUFFER_LENGTH;
+		}
 		printf("Reading from the device...\n");
-		ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
+		ret = read(fd, receive, readLength);        // Read the response from the LKM
 		if (ret < 0){
 			perror("Failed to read the message from the device.");
 			return errno;
