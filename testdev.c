@@ -156,7 +156,7 @@ static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, lof
 static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* offset) {
 	//TODO: Stub
 	int err =0;
-	size_t i;
+	//size_t i;
 	if(len > messageSize) {
 		if (messageSize > 0) {
 			err = copy_to_user(buffer, message, messageSize);
@@ -165,9 +165,7 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 		}
 		if(err == 0) {
 			printk(KERN_INFO "testdev: Sent %d characters to user.\n", messageSize);
-			for (i = 0; i < BUFF_SIZE; i++) {
-				message[i] = 0;
-			}
+			strcpy(message,"");
 			return (messageSize = 0);
 		} else {
 			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
