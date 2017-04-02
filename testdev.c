@@ -24,7 +24,7 @@ MODULE_DESCRIPTION("A simple character-mode Driver.");
 
 static int majorNumber;
 static char message[BUFF_SIZE] = {0};
-static int messageSize;
+static int messageSize = 0;
 static struct class * testdevClass = NULL;
 static struct device* testdevDevice = NULL;
 
@@ -102,27 +102,57 @@ static int dev_release(struct inode* inodep, struct file* filep) {
 
 //Write: write information to the device
 static ssize_t dev_write(struct file* filep, const char* buffer, size_t len, loff_t* offset) {
-	int space = BUFF_SIZE; 
-	if(space > 0) {
-		//sprintf(message,"%s",buffer);
-		strncpy(message, buffer, space);   // appending received string
-		messageSize = strlen(message);    // store the length of the stored message
-		if(message[0] == '\n' && messageSize == 1){
-			strcpy(message,"");
-			messageSize = 0;
-		}
-		space -= messageSize;
-		if(space >= len) {
-			printk(KERN_INFO "testdev: Received %zu characters from the user\n", messageSize);
-			return len;
-		} else {
-			printk(KERN_INFO "testdev: Received %zu characters from the user. Buffer full\n", space);
-			return space;
+//	int space = BUFF_SIZE - strlen(buffer);
+//	if(space > 0) {
+//		if(buffer[0] == '\n' && strlen(buffer) == 1) {
+//			strcat(message,"");
+//			
+//		} else {
+//			
+//		}
+//		strcat(message,buffer);
+//		strncpy(message, buffer, space);   // appending received string
+//		messageSize = strlen(message);    // store the length of the stored message
+//		if(buffer[0] == '\n' && strlen(buffer) == 1){
+//			strcpy(message,"");
+//			messageSize = 0;
+//		}
+//		space -= messageSize;
+//		if(space >= len) {
+//			printk(KERN_INFO "testdev: Received %zu characters from the user\n", messageSize);
+//			return len;
+//		} else {
+//			printk(KERN_INFO "testdev: Received %zu characters from the user. Buffer full\n", space);
+//			return space;
+//		}
+//	} else {
+//		printk(KERN_INFO "testdev: Cannot receive characters from the user. Buffer full.\n");
+//		return -1;
+//	}
+	int space = BUFF_SIZE - messageSize;
+	if (space > 0) {
+		if (buffer[0] == '\n' && len == 1){return -1;}
+		else {
+			if (space > len) {
+				strcat(message,buffer);
+				messageSize = strlen(message);
+				printk(KERN_INFO "testdev: Received %zu characters from the user\n", len);
+				return len;
+			} else {
+				strncat(message,buffer,len-space);
+				messageSize = strlen(message);
+				printk(KERN_INFO "testdev: Buffer full. Only wrote %zu characters from the user.\n", len-space);
+				return len-space;
+			}
 		}
 	} else {
 		printk(KERN_INFO "testdev: Cannot receive characters from the user. Buffer full.\n");
 		return -1;
+
 	}
+
+
+	
 }
 
 //Read: read information from the device
@@ -133,7 +163,7 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 		err = copy_to_user(buffer, message, strlen(message));
 		if(err == 0) {
 			printk(KERN_INFO "testdev: Sent %d characters to user.\n", strlen(message));
-			return (messageSize = 0);
+			return 0;
 		} else {
 			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
 			return err;
@@ -145,7 +175,7 @@ static ssize_t dev_read(struct file* filep, char* buffer, size_t len, loff_t* of
 			//I dislike messing with strings as char arrays directly, but it seems that's the only choice for substrings in c.
 			//TODO: Edge cases need to be tested thoroughly, this is very prone to off-by-one errors or accesses beyond the terminating null.
 			memcpy(message, &message[len], strlen(message) - len);
-			return (messageSize = 0);
+			return 0;
 		} else {
 			printk(KERN_INFO "testdev: Error, failed to send characters to user.\n");
 			return err;
